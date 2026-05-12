@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cadastro-api
+  namespace: api
+  labels:
+    app: cadastro-api
+
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: cadastro-api
+
+  template:
+    metadata:
+      labels:
+        app: cadastro-api
+
+    spec:
+      containers:
+        - name: cadastro-api
+          image: cadastroapi:1.4
+          imagePullPolicy: Never
+
+          ports:
+            - containerPort: 80
+
+          env:
+          - name: ConnectionStrings__Default
+            value: "Server=mysql.banco.svc.cluster.local;Port=3306;Database=Usuario;User=apiuser;Password=admin123;"
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
