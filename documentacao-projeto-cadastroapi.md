@@ -3,6 +3,29 @@
 Esta documentação atende aos requisitos obrigatórios para avaliação do projeto de infraestrutura, orquestração e monitoramento de aplicações. O projeto consiste em uma API desenvolvida em .NET conectada a um banco MySQL, rodando em um cluster Kubernetes com observabilidade completa via Prometheus e Grafana.
 
 ---
+Este repositório contém a infraestrutura de monitoramento para a CadastroAPI (.NET) em Kubernetes.
+# Estrutura do Projeto
+
+## Pastas Principais
+- `/CadastroApi`: Código fonte .NET.
+- `/Infra`: Manifestos YAML da Infraestrutura.
+- `/Monitoramento`: Monitoramento do projeto em prometheus + grafana.
+
+## Namespaces
+- `api`: CadastroAPI.
+- `banco`: Banco de dados MYSQL.
+- `monitoring`: Prometheus + Grafana.
+
+## Requisitos Atendidos
+- Cluster local (Kind).
+- Namespaces separados (`api`, `monitoring`, `banco`).
+- Deployment com 3 réplicas e limites de recursos.
+- Dashboards funcionais no Grafana.
+
+## Desafio Técnico (Simulado)
+- **Problema:** Erro de DNS no `kube-state-metrics`.
+- **Identificação:** Status "DOWN" no Prometheus Target Health.
+- **Solução:** Correção do endpoint no ConfigMap para `kube-system`.
 
 ## 1. Validação dos Requisitos Obrigatórios
 
@@ -10,8 +33,9 @@ A arquitetura atual contempla 100% dos requisitos solicitados:
 
 * **Cluster Local:** Implementado utilizando Kind/Minikube, totalmente funcional e gerenciado via `kubectl`.
 * **Organização (Namespaces):** O cluster está isolado logicamente em dois namespaces principais:
-    * `api`: Contém a aplicação .NET e o banco de dados MySQL.
+    * `api`: Contém a aplicação .NET.
     * `monitoring`: Contém a stack de observabilidade (Prometheus e Grafana).
+    * `banco`: Contém o banco de dados MYSQL.
 * **Aplicação (Deployment, Réplicas e Service):** A API está rodando no cluster via um manifesto de `Deployment`. Para garantir alta disponibilidade (HA) e atender aos requisitos, foram configuradas **3 réplicas** simultâneas. A aplicação está exposta para consumo através de um `Service` (ClusterIP com Port-Forward).
 * **Configuração de Recursos (CPU/Memória):** O manifesto da API possui limites estritos definidos para evitar esgotamento do nó:
     ```yaml
@@ -33,6 +57,10 @@ A arquitetura atual contempla 100% dos requisitos solicitados:
 
 Durante a implementação e os testes de carga da infraestrutura, enfrentamos um problema crítico de comunicação de rede interna que comprometeu a visibilidade do cluster. A análise aprofundada desse incidente compõe o nosso desafio técnico.
 
+## Teste de Carga
+
+Para o teste do cluster, utilizei dois testes de carga (ambos sugeridos pela IA). O primeiro foi o hey, através da linha de comando kubectl run load-generator --image=williamyeh/hey --rm -it --restart=Never -- -c 50 -n 30000 http://cadastro-api.api.svc.cluster.local:80/api/Usuario onde o kubernetes baixa uma imagem do hey e criar um pod. O pod abre cerca de 50 conexões ao mesmo tempo e lança milhares de requisições na API HTTP GET que criei.
+
 ### O que aconteceu?
 O dashboard principal de monitoramento do Kubernetes no Grafana passou a exibir telas vazias com o alerta "N/D" (Sem dados) em todos os gráficos de utilização de memória e CPU. O menu de seleção de servidores ("Nós") estava inacessível, indicando que o Grafana havia perdido a referência de quais máquinas existiam no cluster.
 
@@ -52,18 +80,26 @@ O arquivo `configmap.yaml` do Prometheus foi instruído a buscar os dados no end
 ### Como resolvi
 O processo de resolução seguiu três etapas para corrigir a rota e restabelecer o DNS:
 
-1.  **Correção do Manifesto:** Abrimos o `configmap.yaml` e alteramos o FQDN (Fully Qualified Domain Name) do alvo no Prometheus, mudando de `monitoring` para `kube-system` e ajustando a porta para `8080` (padrão oficial). A linha ficou: `"kube-state-metrics.kube-system.svc.cluster.local:8080"`.
-2.  **Aplicação da Configuração:** Rodamos o comando `kubectl apply -f configmap.yaml` para atualizar a configuração no banco do Kubernetes.
-3.  **Recarregamento do Pod:** Para forçar o Prometheus a ler as novas rotas de DNS imediatamente, destruímos o pod antigo com `kubectl delete pods -l app=prometheus -n monitoring`. O Deployment automaticamente subiu um pod novo.
+1.  **Correção do Manifesto:** Abri o `configmap.yaml` e alterei o FQDN (Fully Qualified Domain Name) do alvo no Prometheus, mudando de `monitoring` para `kube-system` e ajustando a porta para `8080` (padrão oficial). A linha ficou: `"kube-state-metrics.kube-system.svc.cluster.local:8080"`.
+2.  **Aplicação da Configuração:** Rodei o comando `kubectl apply -f configmap.yaml` para atualizar a configuração no banco do Kubernetes.
+3.  **Recarregamento do Pod:** Para forçar o Prometheus a ler as novas rotas de DNS imediatamente, destruí o pod antigo com `kubectl delete pods -l app=prometheus -n monitoring`. O Deployment automaticamente subiu um pod novo.
 
-Após alguns segundos, o Target no Prometheus mudou para **UP** (verde) e os dashboards do Grafana voltaram a preencher os gráficos em tempo real.
+Após isso, o Target no Prometheus mudou para **UP** (verde) e os dashboards do Grafana voltaram a preencher os gráficos em tempo real.
 
 ---
 
 ## 3. Entregáveis
 
 * **Repositório:** (https://github.com/Jonathan-EngSoftware/Monitoramento-Api-e-Cluster-Kubernetes.git) contendo todos os manifestos (YAML), Dockerfiles e o código C# da API.
-* **Demonstrações:** O ambiente e as métricas geradas pela ferramenta de estresse (`hey`) estão documentados nas imagens e em execução no cluster local.
+* **Demonstrações:** O ambiente e as métricas geradas pela ferramenta de estresse (`hey` e o `wrk`) estão documentados nas imagens e em execução no cluster local.
 
 **Autor:** Jonathan Henrique Ribeiro Coutinho de Almeida
 **Data:** Maio de 2026
+
+## Comandos para o teste de carga
+
+`Hey`: Gera grande volume de dados na api e no banco - kubectl run tsunami --image=williamyeh/hey --rm -it --restart=Never -- -c 5000 -z 60s http://cadastro-api.api.svc.cluster.local:80/api/Usuario
+
+`Wrk`: Usa múltiplas threads do processador - kubectl run destruidor-wrk --image=williamyeh/wrk --rm -it --restart=Never -- -t4 -c400 -d60s http://cadastro-api.api.svc.cluster.local:80/api/Usuario
+
+`K6`: Simula um comportamento real com rampas de acesso, sobe, mantém e desce o tráfego - kubectl run k6-test --image=grafana/k6 --rm -i --restart=Never -- run - < teste-k6.js

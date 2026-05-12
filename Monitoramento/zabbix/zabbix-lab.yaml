@@ -4,7 +4,18 @@ kind: Namespace
 metadata:
   name: zabbix-lab
 ---
-
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pvc
+  namespace: zabbix-lab
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 3Gi  
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -37,6 +48,13 @@ spec:
           value: "senha_forte_zabbix"
         - name: MYSQL_DATABASE
           value: "zabbix"
+        volumeMounts:
+        - name: mysql-storage
+          mountPath: /var/lib/mysql  # Aqui é onde o MySQL guarda os dados físicos
+      volumes:
+      - name: mysql-storage
+        persistentVolumeClaim:
+          claimName: mysql-pvc
 ---
 apiVersion: v1
 kind: Service
@@ -50,7 +68,6 @@ spec:
     - port: 3306
       targetPort: 3306
 ---
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -93,7 +110,6 @@ spec:
     - port: 10051
       targetPort: 10051
 ---
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
