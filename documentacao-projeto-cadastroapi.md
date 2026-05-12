@@ -62,7 +62,7 @@ Após alguns segundos, o Target no Prometheus mudou para **UP** (verde) e os das
 
 ## 3. Entregáveis
 
-* **Repositório:** [Inserir Link do GitHub aqui] contendo todos os manifestos (YAML), Dockerfiles e o código C# da API.
+* **Repositório:** (https://github.com/Jonathan-EngSoftware/Monitoramento-Api-e-Cluster-Kubernetes.git) contendo todos os manifestos (YAML), Dockerfiles e o código C# da API.
 * **Demonstrações:** O ambiente e as métricas geradas pela ferramenta de estresse (`hey`) estão documentados nas imagens e em execução no cluster local.
 
 **Autor:** Jonathan Henrique Ribeiro Coutinho de Almeida
